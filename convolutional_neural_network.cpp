@@ -1,7 +1,10 @@
 #include <math.h>
 
+#include <algorithm>
 #include <iostream>
+#include <iterator>
 #include <map>
+#include <random>
 #include <regex>
 #include <string>
 #include <tuple>
@@ -604,6 +607,71 @@ class ConvNet {
     return label;
   }
 
+  void fit(vector<vector<vector<vector<double>>>> X, int Y[]) {
+    /* Fit function.
+
+    This is the gradient descent function.
+
+    (1) Take a minibatch of examples (20%)
+    (2) Run each example through _calc_dLoss_dParam and average out the gradient for the minibatch examples
+    (3) Take a step alpha from current weights and biases towards the directions of the gradient
+    (4) Repeat steps 2-4 until some convergence criteria
+    (5) Evaluate the Loss every so often
+
+    */
+
+    int num_steps = 100;
+
+    for (int i = 0; i < num_steps; i++) {
+      vector<int> batch = take_minibatch(X.size(), 0.2, i);
+
+      cout << "Current (total) Loss is " << TotalLoss(X, Y) << endl;
+
+      vector<tuple<vector<vector<vector<double>>>, vector<double>>> dParam_acc;
+
+      for (int j = 0; j < batch.size(); j++) {
+        h(X[batch[j]]);
+        vector<tuple<vector<vector<vector<double>>>, vector<double>>> dParam = _calc_dLoss_dParam(Y[batch[j]]);
+
+        // Add dParam to dParam_acc;
+      }
+      // Divide dParam_acc by batch.size()
+
+      // Update each layer's parameters
+      // for each layer,
+      //   if layer == Dense,
+      //      layer.weights += alpha * dParam_acc[0]
+      //      layer.biases += alpha * dParam_acc[1]
+    }
+  }
+
+  vector<int> take_minibatch(int N, double r, int i) {
+    std::vector<int> v(N);                     // vector with 100 ints.
+    std::iota(std::begin(v), std::end(v), 0);  // Fill with 0, 1, ..., 99.
+
+    int k = floor(N * r);  // size of each batch
+
+    // std::vector<int> sample;
+    // std::sample(v.begin(), v.end(),
+    //             std::back_inserter(sample),
+    //             5,
+    //             std::mt19937{std::random_device{}()});
+
+    // [1, 2, 3, 4, ..., N]
+    // k = 3
+    // [1, 2, 3]
+    // [4, 5, 6]
+    // ...
+    // [N-1, N, 1]
+
+    vector<int> batch;
+    for (int j = k * i; j <= j + k; j++) {
+      batch.push_back(v[j % v.size()]);
+    }
+
+    return batch;
+  }
+
   // Calculate the loss function
   double Loss(vector<vector<vector<double>>> x, int y) {
     if (y == 10) {
@@ -617,6 +685,16 @@ class ConvNet {
 
     for (int i = 0; i < feature_map.size(); i++) {
       acc += (feature_map[i][0][0] - y_vector[i]) * (feature_map[i][0][0] - y_vector[i]) / 2;
+    }
+    return acc;
+  }
+
+    // Calculate the loss function
+  double TotalLoss(vector<vector<vector<vector<double>>>> X, int Y[]) {
+    double acc{0};
+
+    for (int i = 0; i < X.size(); i++) {
+      acc += Loss(X[i], Y[i]);
     }
     return acc;
   }
@@ -915,7 +993,6 @@ class ConvNet {
     }
   }
 
-
   void static h_test_3(vector<vector<vector<vector<double>>>> X, int Y[100]) {
     // // Intialize model and evaluate an example test
     // // Compound literal, (vector[]), helps initialize an array in function call
@@ -1010,7 +1087,7 @@ int main() {
     ConvNet::h_test_2(X, Y);
     cout << "ConvNet h_test2 done\n" << endl;
 
-    ConvNet::h_test_2_bias(X,Y);
+    ConvNet::h_test_2_bias(X, Y);
     cout << "ConvNet h_test_2_bias done \n" << endl;
   } catch (string my_exception) {
     cout << my_exception << endl;
