@@ -16,6 +16,8 @@ using namespace std;
 // Good diagram:
 // https://engmrk.com/wp-content/uploads/2018/09/Image-Architecture-of-Convolutional-Neural-Network.png
 
+bool be_random = true;
+
 class Layer {
  public:
   virtual ~Layer() = default;
@@ -24,8 +26,6 @@ class Layer {
 
   // Helper functions
   static void rand_init(vector<vector<vector<double>>>& tensor, int height, int width) {
-    srand(time(NULL));  // Remove to stop seeding rand()
-
     for (int i = 0; i < height; i++) {
       for (int j = 0; j < width; j++) {
         // use numbers between -10 and 10
@@ -37,8 +37,6 @@ class Layer {
   }
 
   static void rand_init(vector<vector<double>>& matrix, int height, int width) {
-    srand(time(NULL));  // Remove to stop seeding rand()
-
     for (int i = 0; i < height; i++) {
       for (int j = 0; j < width; j++) {
         // use numbers between -10 and 10
@@ -50,7 +48,6 @@ class Layer {
   }
 
   static void rand_init(vector<double>& matrix, int length) {
-    srand(time(NULL));  // Remove to stop seeding rand()
     for (int i = 0; i < length; i++) {
       // use numbers between -10 and 10
       double n = (double)rand() / RAND_MAX;  // scales rand() to [0, 1].
@@ -59,13 +56,75 @@ class Layer {
     }
   }
 
+  vector<double> static add_vectors(vector<double> a, vector<double> b) {
+    vector<double> c(a.size(), 0);
+
+    for (int i = 0; i < a.size(); i++) {
+      c[i] = (a[i] + b[i]);
+    }
+
+    return c;
+  }
+
+  vector<double> static scalar_multiple(vector<double> a, double n) {
+    vector<double> c(a.size(), 0);
+
+    for (int i = 0; i < a.size(); i++) {
+      c[i] = n * (a[i]);
+    }
+
+    return c;
+  }
+
   vector<vector<double>> static add_matrices(vector<vector<double>> a, vector<vector<double>> b) {
     vector<vector<double>> c(a.size(), vector<double>(a[0].size(), 0));
 
     for (int i = 0; i < a.size(); i++) {
-      vector<double> c_column;
       for (int j = 0; j < a[0].size(); j++) {
         c[i][j] = (a[i][j] + b[i][j]);
+      }
+    }
+
+    return c;
+  }
+
+  vector<vector<double>> static scalar_multiple(vector<vector<double>> a, double n) {
+    vector<vector<double>> c(a.size(), vector<double>(a[0].size(), 0));
+
+    for (int i = 0; i < a.size(); i++) {
+      for (int j = 0; j < a[0].size(); j++) {
+        c[i][j] = n * (a[i][j]);
+      }
+    }
+
+    return c;
+  }
+
+  vector<vector<vector<double>>> static add_tensors(vector<vector<vector<double>>> a,
+                                                    vector<vector<vector<double>>> b) {
+    vector<vector<vector<double>>> c(a.size(), vector<vector<double>>(a[0].size(), vector<double>(a[0][0].size(), 0)));
+
+    vector<vector<vector<double>>> c_column;
+    for (int i = 0; i < a.size(); i++) {
+      for (int j = 0; j < a[0].size(); j++) {
+        for (int k = 0; k < a[0][0].size(); k++) {
+          c[i][j][k] = (a[i][j][k] + b[i][j][k]);
+        }
+      }
+    }
+
+    return c;
+  }
+
+  vector<vector<vector<double>>> static scalar_multiple(vector<vector<vector<double>>> a, double n) {
+    vector<vector<vector<double>>> c(a.size(), vector<vector<double>>(a[0].size(), vector<double>(a[0][0].size(), 0)));
+
+    vector<vector<vector<double>>> c_column;
+    for (int i = 0; i < a.size(); i++) {
+      for (int j = 0; j < a[0].size(); j++) {
+        for (int k = 0; k < a[0][0].size(); k++) {
+          c[i][j][k] = n * (a[i][j][k]);
+        }
       }
     }
 
@@ -595,14 +654,14 @@ class ConvNet {
 
     // Take argmax of the output
     int label = 0;
-    cout << feature_map[0][0][0] << ",";
+    // cout << feature_map[0][0][0] << ",";
     for (int i = 1; i < feature_map.size(); i++) {
-      cout << feature_map[i][0][0] << ",";
+      // cout << feature_map[i][0][0] << ",";
       if (feature_map[label][0][0] < feature_map[i][0][0]) {
         label = i;
       }
     }
-    cout << endl;
+    // cout << endl;
 
     return label;
   }
@@ -621,55 +680,109 @@ class ConvNet {
     */
 
     int num_steps = 100;
+    double alpha = 0.01;
+    double minibatch_ratio = 0.1;
 
     for (int i = 0; i < num_steps; i++) {
-      vector<int> batch = take_minibatch(X.size(), 0.2, i);
+      vector<int> batch = take_minibatch(X.size(), minibatch_ratio);
 
-      cout << "Current (total) Loss is " << TotalLoss(X, Y) << endl;
+      if (i % 10 == 0) {
+        cout << "Step: " << i << ". Loss is " << TotalLoss(X, Y) << ". Accuracy is " << TotalAccuracy(X, Y) << endl;
+      }
 
       vector<tuple<vector<vector<vector<double>>>, vector<double>>> dParam_acc;
 
       for (int j = 0; j < batch.size(); j++) {
-        h(X[batch[j]]);
-        vector<tuple<vector<vector<vector<double>>>, vector<double>>> dParam = _calc_dLoss_dParam(Y[batch[j]]);
+        h(X[batch[j]]);  // Saves a bunch of variables that we need for the backward pass
+        vector<tuple<vector<vector<vector<double>>>, vector<double>>> dParam_per_layer =
+            _calc_dLoss_dParam(Y[batch[j]]);
 
-        // Add dParam to dParam_acc;
+        if (j == 0) {
+          dParam_acc = dParam_per_layer;
+        } else {
+          for (int k = 0; k < dParam_per_layer.size(); k++) {
+            tuple<vector<vector<vector<double>>>, vector<double>> dParam = dParam_per_layer[k];
+
+            // Do the accumulation for weights
+            vector<vector<vector<double>>> weights = get<0>(dParam);
+            get<0>(dParam_acc[k]) = Layer::add_tensors(get<0>(dParam_acc[k]), weights);
+
+            // Do the accumulation for biases
+            vector<double> biases = get<1>(dParam);
+            get<1>(dParam_acc[k]) = Layer::add_vectors(get<1>(dParam_acc[k]), biases);
+          }
+        }
       }
-      // Divide dParam_acc by batch.size()
+      for (int k = 0; k < dParam_acc.size(); k++) {
+        get<0>(dParam_acc[k]) = Layer::scalar_multiple(get<0>(dParam_acc[k]), batch.size());
+        get<1>(dParam_acc[k]) = Layer::scalar_multiple(get<1>(dParam_acc[k]), batch.size());
+      }
 
-      // Update each layer's parameters
-      // for each layer,
-      //   if layer == Dense,
-      //      layer.weights += alpha * dParam_acc[0]
-      //      layer.biases += alpha * dParam_acc[1]
+      // Add tensor to weights (first part of the tuple) and vector (second part of tuple) to biases
+      // Do this for each layer (that's why dParam is a vector)
+
+      // Add dParam to dParam_acc;
+
+      int k = 0;
+      for (int L = layers.size() - 1; L >= 0; L--) {
+        bool is_last_output_box = false;
+        Layer* layer = layers[L];
+        if (Conv* conv = dynamic_cast<Conv*>(layer)) {
+        } else if (MaxPool* pool = dynamic_cast<MaxPool*>(layer)) {
+        } else if (Act* act = dynamic_cast<Act*>(layer)) {
+        } else if (Flatten* flatten = dynamic_cast<Flatten*>(layer)) {
+        } else if (Dense* dense = dynamic_cast<Dense*>(layer)) {
+          dense->weights =
+              Layer::add_tensors(dense->weights, Layer::scalar_multiple(get<0>(dParam_acc[k]), -1 * alpha));
+
+          dense->biases = Layer::add_vectors(dense->biases, Layer::scalar_multiple(get<1>(dParam_acc[k]), -1 * alpha));
+
+          k += 1;
+        }
+      }
     }
+    cout << "Step: " << num_steps-1 << ". Loss is " << TotalLoss(X, Y) << ". Accuracy is " << TotalAccuracy(X, Y) << endl;
   }
 
-  vector<int> take_minibatch(int N, double r, int i) {
-    std::vector<int> v(N);                     // vector with 100 ints.
-    std::iota(std::begin(v), std::end(v), 0);  // Fill with 0, 1, ..., 99.
+  vector<int> take_minibatch(int N, double r) {
+    vector<int> v(N);                     // vector with 100 ints.
+    iota(std::begin(v), std::end(v), 0);  // Fill with 0, 1, ..., 99.
 
     int k = floor(N * r);  // size of each batch
 
-    // std::vector<int> sample;
-    // std::sample(v.begin(), v.end(),
-    //             std::back_inserter(sample),
-    //             5,
-    //             std::mt19937{std::random_device{}()});
-
-    // [1, 2, 3, 4, ..., N]
-    // k = 3
-    // [1, 2, 3]
-    // [4, 5, 6]
-    // ...
-    // [N-1, N, 1]
-
-    vector<int> batch;
-    for (int j = k * i; j <= j + k; j++) {
-      batch.push_back(v[j % v.size()]);
+    vector<int> out;
+    size_t nelems = k;
+    if (be_random) {
+      std::sample(v.begin(), v.end(), std::back_inserter(out), nelems, std::mt19937{std::random_device{}()});
+    } else {
+      std::sample(v.begin(), v.end(), std::back_inserter(out), nelems, std::mt19937{});
     }
 
-    return batch;
+    return out;
+  }
+
+  // Calculate the accuracy per example
+  double Accuracy(vector<vector<vector<double>>> x, int y) {
+    if (y == 10) {
+      throw(string) "Mismatch between label definition in Loss and incoming label!";
+    }
+    int label = predict(x);
+
+    if (label == y) {
+      return 1;
+    } else {
+      return 0;
+    }
+  }
+
+  // Calculate the accuracy
+  double TotalAccuracy(vector<vector<vector<vector<double>>>> X, int Y[]) {
+    double acc{0};
+
+    for (int i = 0; i < X.size(); i++) {
+      acc += Accuracy(X[i], Y[i]);
+    }
+    return acc;
   }
 
   // Calculate the loss function
@@ -689,7 +802,7 @@ class ConvNet {
     return acc;
   }
 
-    // Calculate the loss function
+  // Calculate the loss function
   double TotalLoss(vector<vector<vector<vector<double>>>> X, int Y[]) {
     double acc{0};
 
@@ -757,7 +870,6 @@ class ConvNet {
 
         dLoss/da_i^L = (a_i^L - y_i)            ok
 
-        //TODO
         dLoss/dB_i^L = dz_i^L/dB_i^L * [da_i^L/dz_i^L * dLoss/da_i^L]
         */
 
@@ -827,7 +939,7 @@ class ConvNet {
 
   void static h_test_1(vector<vector<vector<vector<double>>>> X, int Y[100]) {
     Flatten flatten = Flatten();
-    Dense dense = Dense(2, 4);
+    Dense dense = Dense(2, 64);
     Sigmoid sigmoid = Sigmoid();
     ConvNet model = ConvNet(vector<Layer*>{&flatten, &dense, &sigmoid});
     // Do a forward pass with the first "image"
@@ -869,7 +981,7 @@ class ConvNet {
 
   void static h_test_1_bias(vector<vector<vector<vector<double>>>> X, int Y[100]) {
     Flatten flatten = Flatten();
-    Dense dense = Dense(2, 4);
+    Dense dense = Dense(2, 64);
     Sigmoid sigmoid = Sigmoid();
     ConvNet model = ConvNet(vector<Layer*>{&flatten, &dense, &sigmoid});
     // Do a forward pass with the first "image"
@@ -909,9 +1021,9 @@ class ConvNet {
 
   void static h_test_2(vector<vector<vector<vector<double>>>> X, int Y[100]) {
     Flatten flatten = Flatten();
-    Dense dense1 = Dense(4, 4);
+    Dense dense1 = Dense(32, 64);
     Sigmoid sigmoid1 = Sigmoid();
-    Dense dense2 = Dense(2, 4);
+    Dense dense2 = Dense(2, 32);
     Sigmoid sigmoid2 = Sigmoid();
     ConvNet model = ConvNet(vector<Layer*>{&flatten, &dense1, &sigmoid1, &dense2, &sigmoid2});
     // Do a forward pass with the first "image"
@@ -953,9 +1065,9 @@ class ConvNet {
 
   void static h_test_2_bias(vector<vector<vector<vector<double>>>> X, int Y[100]) {
     Flatten flatten = Flatten();
-    Dense dense1 = Dense(4, 4);
+    Dense dense1 = Dense(32, 64);
     Sigmoid sigmoid1 = Sigmoid();
-    Dense dense2 = Dense(2, 4);
+    Dense dense2 = Dense(2, 32);
     Sigmoid sigmoid2 = Sigmoid();
     ConvNet model = ConvNet(vector<Layer*>{&flatten, &dense1, &sigmoid1, &dense2, &sigmoid2});
     // Do a forward pass with the first "image"
@@ -993,29 +1105,34 @@ class ConvNet {
     }
   }
 
-  void static h_test_3(vector<vector<vector<vector<double>>>> X, int Y[100]) {
-    // // Intialize model and evaluate an example test
-    // // Compound literal, (vector[]), helps initialize an array in function call
-    // Conv conv = Conv(1, 2, (vector<int>){3, 3}, (vector<int>){1, 1});
-    // MaxPool pool = MaxPool(2);
-    // Relu relu = Relu();
-    // Flatten flatten = Flatten();
-    // Dense dense = Dense(10, 338);
-    // Sigmoid sigmoid = Sigmoid();
-    // ConvNet model = ConvNet(vector<Layer*>{&conv, &pool, &relu, &flatten, &dense, &sigmoid});
-    // // Do a forward pass with the first "image"
-    // int label = model.predict(X[0]);
-    // cout << label << endl;
+  void static fit_test_1(vector<vector<vector<vector<double>>>> X, int Y[100]) {
+    Flatten flatten = Flatten();
+    Dense dense = Dense(2, 64);
+    Sigmoid sigmoid = Sigmoid();
+    ConvNet model = ConvNet(vector<Layer*>{&flatten, &dense, &sigmoid});
 
-    // if (!(label >= 0 && 10 > label)) {
-    //   throw(string) "Test failed! " + (string) __FUNCTION__;
-    // }
+    model.fit(X, Y);
+  }
 
-    // model._calc_dLoss_dWs();
+  void static fit_test_2(vector<vector<vector<vector<double>>>> X, int Y[100]) {
+    Flatten flatten = Flatten();
+    Dense dense1 = Dense(32, 64);
+    Sigmoid sigmoid1 = Sigmoid();
+    Dense dense2 = Dense(2, 32);
+    Sigmoid sigmoid2 = Sigmoid();
+    ConvNet model = ConvNet(vector<Layer*>{&flatten, &dense1, &sigmoid1, &dense2, &sigmoid2});
+
+    model.fit(X, Y);
   }
 };
 
 int main() {
+  if (be_random) {
+    srand(time(NULL));
+  } else {
+    srand(2021);
+  }
+
   // TESTS
   // set up
 
@@ -1027,9 +1144,9 @@ int main() {
   for (int i = 0; i < num_images; i++) {
     vector<vector<vector<double>>> image;
     vector<vector<double>> channel;  // Only one channel per image here.
-    for (int j = 0; j < 2; j++) {
+    for (int j = 0; j < 8; j++) {
       vector<double> row;
-      for (int k = 0; k < 2; k++) {
+      for (int k = 0; k < 8; k++) {
         double f = (double)rand() / RAND_MAX;
         double num = f;  // should be from 0 to 255 but scaled to [0, 1]
         row.push_back(num);
@@ -1038,7 +1155,7 @@ int main() {
     }
     image.push_back(channel);
     X.push_back(image);
-    Y[i] = rand() % 2;  // TODO: Maybe decrease number of classes for the test?
+    Y[i] = rand() % 3;  // TODO: Maybe decrease number of classes for the test?
   }
 
   // Look at first 2 "images"
@@ -1089,9 +1206,15 @@ int main() {
 
     ConvNet::h_test_2_bias(X, Y);
     cout << "ConvNet h_test_2_bias done \n" << endl;
+
+    ConvNet::fit_test_1(X, Y);
+    cout << "ConvNet fit_test_1 done \n" << endl;
+
+    ConvNet::fit_test_2(X, Y);
+    cout << "ConvNet fit_test_2 done \n" << endl;
   } catch (string my_exception) {
     cout << my_exception << endl;
-    return 0;  // Do not go past the first exception in a test
+    return 1;  // Do not go past the first exception in a test
   }
 
   cout << "Tests finished!!!!\n" << endl;
