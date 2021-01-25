@@ -939,7 +939,7 @@ class ConvNet {
 
   void static h_test_1(vector<vector<vector<vector<double>>>> X, int Y[100]) {
     Flatten flatten = Flatten();
-    Dense dense = Dense(2, 64);
+    Dense dense = Dense(3, 16);
     Sigmoid sigmoid = Sigmoid();
     ConvNet model = ConvNet(vector<Layer*>{&flatten, &dense, &sigmoid});
     // Do a forward pass with the first "image"
@@ -981,7 +981,7 @@ class ConvNet {
 
   void static h_test_1_bias(vector<vector<vector<vector<double>>>> X, int Y[100]) {
     Flatten flatten = Flatten();
-    Dense dense = Dense(2, 64);
+    Dense dense = Dense(3, 16);
     Sigmoid sigmoid = Sigmoid();
     ConvNet model = ConvNet(vector<Layer*>{&flatten, &dense, &sigmoid});
     // Do a forward pass with the first "image"
@@ -1021,9 +1021,9 @@ class ConvNet {
 
   void static h_test_2(vector<vector<vector<vector<double>>>> X, int Y[100]) {
     Flatten flatten = Flatten();
-    Dense dense1 = Dense(32, 64);
+    Dense dense1 = Dense(8, 16);
     Sigmoid sigmoid1 = Sigmoid();
-    Dense dense2 = Dense(2, 32);
+    Dense dense2 = Dense(3, 8);
     Sigmoid sigmoid2 = Sigmoid();
     ConvNet model = ConvNet(vector<Layer*>{&flatten, &dense1, &sigmoid1, &dense2, &sigmoid2});
     // Do a forward pass with the first "image"
@@ -1065,9 +1065,9 @@ class ConvNet {
 
   void static h_test_2_bias(vector<vector<vector<vector<double>>>> X, int Y[100]) {
     Flatten flatten = Flatten();
-    Dense dense1 = Dense(32, 64);
+    Dense dense1 = Dense(8, 16);
     Sigmoid sigmoid1 = Sigmoid();
-    Dense dense2 = Dense(2, 32);
+    Dense dense2 = Dense(3, 8);
     Sigmoid sigmoid2 = Sigmoid();
     ConvNet model = ConvNet(vector<Layer*>{&flatten, &dense1, &sigmoid1, &dense2, &sigmoid2});
     // Do a forward pass with the first "image"
@@ -1107,7 +1107,7 @@ class ConvNet {
 
   void static fit_test_1(vector<vector<vector<vector<double>>>> X, int Y[100]) {
     Flatten flatten = Flatten();
-    Dense dense = Dense(2, 64);
+    Dense dense = Dense(3, 16);
     Sigmoid sigmoid = Sigmoid();
     ConvNet model = ConvNet(vector<Layer*>{&flatten, &dense, &sigmoid});
 
@@ -1116,9 +1116,9 @@ class ConvNet {
 
   void static fit_test_2(vector<vector<vector<vector<double>>>> X, int Y[100]) {
     Flatten flatten = Flatten();
-    Dense dense1 = Dense(32, 64);
+    Dense dense1 = Dense(8, 16);
     Sigmoid sigmoid1 = Sigmoid();
-    Dense dense2 = Dense(2, 32);
+    Dense dense2 = Dense(3, 8);
     Sigmoid sigmoid2 = Sigmoid();
     ConvNet model = ConvNet(vector<Layer*>{&flatten, &dense1, &sigmoid1, &dense2, &sigmoid2});
 
@@ -1144,9 +1144,9 @@ int main() {
   for (int i = 0; i < num_images; i++) {
     vector<vector<vector<double>>> image;
     vector<vector<double>> channel;  // Only one channel per image here.
-    for (int j = 0; j < 8; j++) {
+    for (int j = 0; j < 4; j++) {
       vector<double> row;
-      for (int k = 0; k < 8; k++) {
+      for (int k = 0; k < 4; k++) {
         double f = (double)rand() / RAND_MAX;
         double num = f;  // should be from 0 to 255 but scaled to [0, 1]
         row.push_back(num);
